@@ -135,12 +135,14 @@ endfunction()
 function(_pmm_generate_cli_scripts force)
     # The sh scipt
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/pmm-cli.sh" OR ${force})
+        file(LOCK "${_PMM_USER_DATA_DIR}" DIRECTORY TIMEOUT 5)
         file(WRITE "${_PMM_USER_DATA_DIR}/pmm-cli.sh" "#!/bin/sh\n${CMAKE_COMMAND} -P ${PMM_MODULE} \"$@\"")
         # Fix to make the sh executable
         file(COPY "${_PMM_USER_DATA_DIR}/pmm-cli.sh"
              DESTINATION ${CMAKE_BINARY_DIR}
              FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
         )
+        file(LOCK "${_PMM_USER_DATA_DIR}" DIRECTORY RELEASE)
     endif()
     # The bat scipt
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/pmm-cli.bat" OR ${force})
@@ -151,12 +153,14 @@ endfunction()
 function(_pmm_generate_shim name executable)
     # The sh scipt
     if (NOT EXISTS "${CMAKE_BINARY_DIR}/${name}.sh")
+        file(LOCK "${_PMM_USER_DATA_DIR}" DIRECTORY TIMEOUT 5)
         file(WRITE "${_PMM_USER_DATA_DIR}/${name}.sh" "#!/bin/sh\n\"${executable}\" \"$@\"")
         # Fix to make the sh executable
         file(COPY "${_PMM_USER_DATA_DIR}/${name}.sh"
                 DESTINATION ${CMAKE_BINARY_DIR}
                 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-                )
+        )
+        file(LOCK "${_PMM_USER_DATA_DIR}" DIRECTORY RELEASE)
     endif ()
     # The bat scipt
     if (NOT EXISTS "${CMAKE_BINARY_DIR}/${name}.bat")
