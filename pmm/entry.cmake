@@ -88,7 +88,8 @@ function(_pmm_check_updates)
     endif()
 endfunction()
 
-_pmm_check_updates()
+# I don't have the update setup above, so disable it:
+# _pmm_check_updates()
 
 if(CMAKE_SCRIPT_MODE_FILE)
     _pmm_script_main()
