@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.10)
-
 function(_pmm_read_script_argv var)
     set(got_p FALSE)
     set(got_script FALSE)
@@ -30,13 +28,13 @@ endfunction()
 #
 # This macro makes use of some very horrible aspects of CMake macros:
 # - Values appear the caller's scope, so no need to set(PARENT_SCOPE)
-# - The ${${}ARGV} eldritch horror evaluates to the ARGV *OF THE CALLER*, while
-#   ${ARGV} evaluates to the macro's own ARGV value. This is because ${${}ARGV}
+# - The ${${}ARGN} eldritch horror evaluates to the ARGN *OF THE CALLER*, while
+#   ${ARGN} evaluates to the macro's own ARGN value. This is because ${${}ARGN}
 #   inhibits macro argument substitution. It is painful, but it makes this magic
 #   work.
 macro(_pmm_parse_args)
-    cmake_parse_arguments(_ "-nocheck;-hardcheck" "" ".;-;+" "${ARGV}")
-    set(__arglist "${${}ARGV}")
+    cmake_parse_arguments(_ "-nocheck;-hardcheck" "" ".;-;+" "${ARGN}")
+    set(__arglist "${${}ARGN}")
     _pmm_parse_arglist("${__.}" "${__-}" "${__+}")
 endmacro()
 
@@ -132,6 +130,7 @@ function(_pmm_get_var_from_file filepath varname)
     set(${varname} ${propt} PARENT_SCOPE)
 endfunction()
 
+
 function(_pmm_generate_cli_scripts force)
     # The sh scipt
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/pmm-cli.sh" OR ${force})
@@ -150,6 +149,7 @@ function(_pmm_generate_cli_scripts force)
     endif()
 endfunction()
 
+
 function(_pmm_generate_shim name executable)
     # The sh scipt
     if (NOT EXISTS "${CMAKE_BINARY_DIR}/${name}.sh")
@@ -166,4 +166,51 @@ function(_pmm_generate_shim name executable)
     if (NOT EXISTS "${CMAKE_BINARY_DIR}/${name}.bat")
         file(WRITE "${CMAKE_BINARY_DIR}/${name}.bat" "@echo off\n\"${executable}\" %*")
     endif ()
+endfunction()
+
+
+function(_pmm_verbose_lock fpath)
+    _pmm_parse_args(
+        . DIRECTORY
+        - FIRST_MESSAGE FAIL_MESSAGE RESULT_VARIABLE LAST_WAIT_DURATION
+        )
+    set(arg_dir)
+    if(ARG_DIRECTORY)
+        set(arg_dir "DIRECTORY")
+    endif()
+    if(NOT ARG_LAST_WAIT_DURATION)
+        set(ARG_LAST_WAIT_DURATION 60)
+    endif()
+    set("${ARG_RESULT_VARIABLE}" TRUE PARENT_SCOPE)
+    file(
+        LOCK "${fpath}" ${arg_dir}
+        GUARD PROCESS
+        TIMEOUT 3
+        RESULT_VARIABLE lock_res
+        )
+    if(NOT lock_res)
+        return()
+    endif()
+    # Couldn't get the lock
+    _pmm_log("${ARG_FIRST_MESSAGE}")
+    file(
+        LOCK "${fpath}" ${arg_dir}
+        GUARD PROCESS
+        TIMEOUT 60
+        RESULT_VARIABLE lock_res
+        )
+    if(NOT lock_res)
+        return()
+    endif()
+    _pmm_log("Unable to obtain lock after 60 seconds. We'll try for ${ARG_LAST_WAIT_DURATION} more seconds...")
+    file(
+        LOCK "${fpath}" ${arg_dir}
+        GUARD PROCESS
+        TIMEOUT "${ARG_LAST_WAIT_DURATION}"
+        RESULT_VARIABLE lock_res
+        )
+    if(lock_res)
+        message(WARNING "${ARG_FAIL_MESSAGE}")
+        set("${ARG_RESULT_VARIABLE}" FALSE PARENT_SCOPE)
+    endif()
 endfunction()

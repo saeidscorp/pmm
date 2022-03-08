@@ -1,3 +1,13 @@
+# Set the policies for the range of supported CMake versions
+cmake_policy(PUSH)
+cmake_minimum_required(VERSION 3.13.0...3.21.4)
+
+if(NOT DEFINED _PMM_BOOTSTRAP_VERSION OR _PMM_BOOTSTRAP_VERSION LESS 4)
+    message(FATAL_ERROR
+            "Using PMM ${PMM_VERSION} requires updating the pmm.cmake bootstrap script. "
+            "Visit the PMM repository to obtain a new copy of pmm.cmake for your project.")
+endif()
+
 # Unset variables that may be affected by a version change
 if(NOT PMM_VERSION STREQUAL PMM_PRIOR_VERSION)
     foreach(var IN ITEMS PMM_CONAN_EXECUTABLE)
@@ -78,22 +88,16 @@ _pmm_check_and_include_file(main.cmake)
 
 # Do the update check.
 function(_pmm_check_updates)
-    set(_latest_version_url "${PMM_URL_BASE}/latest-version.cmake")
-    set(_latest_version_file "${PMM_DIR}/latest-version.cmake")
-    file(DOWNLOAD "${_latest_version_url}" "${_latest_version_file}" STATUS did_download TIMEOUT 5)
+    set(_latest_info_url "${PMM_URL_BASE}/latest-info.cmake")
+    set(_latest_info_file "${PMM_DIR}/latest-info.cmake")
+    file(DOWNLOAD "${_latest_info_url}" "${_latest_info_file}" STATUS did_download TIMEOUT 5)
     list(GET did_download 0 rc)
     if(rc EQUAL 0)
-        include("${_latest_version_file}")
-        if(PMM_VERSION VERSION_LESS PMM_LATEST_VERSION AND NOT PMM_IGNORE_NEW_VERSION)
-            set(_latest_info_url "${PMM_URL_BASE}/changelog.cmake")
-            set(_latest_info_file "${PMM_DIR}/changelog.cmake")
-            _pmm_download("${_latest_info_url}" "${_latest_info_file}")
-            include("${_latest_info_file}")
-        endif()
+        include("${_latest_info_file}")
         _pmm_lift(PMM_LATEST_VERSION)
     else()
         if(NOT PMM_IGNORE_NEW_VERSION)
-            _pmm_log("Failed to check for updates (Couldn't download ${_latest_version_url})")
+            _pmm_log("Failed to check for updates (Couldn't download ${_latest_info_url})")
         endif()
     endif()
 endfunction()
@@ -104,3 +108,6 @@ endfunction()
 if(CMAKE_SCRIPT_MODE_FILE)
     _pmm_script_main()
 endif()
+
+# Restore prior policy settings before returning to our includer
+cmake_policy(POP)
