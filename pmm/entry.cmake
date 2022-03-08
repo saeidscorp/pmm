@@ -1,3 +1,13 @@
+# Set the policies for the range of supported CMake versions
+cmake_policy(PUSH)
+cmake_minimum_required(VERSION 3.13.0...3.21.4)
+
+if(NOT DEFINED _PMM_BOOTSTRAP_VERSION OR _PMM_BOOTSTRAP_VERSION LESS 4)
+    message(FATAL_ERROR
+            "Using PMM ${PMM_VERSION} requires updating the pmm.cmake bootstrap script. "
+            "Visit the PMM repository to obtain a new copy of pmm.cmake for your project.")
+endif()
+
 # Unset variables that may be affected by a version change
 if(NOT PMM_VERSION STREQUAL PMM_PRIOR_VERSION)
     foreach(var IN ITEMS PMM_CONAN_EXECUTABLE)
@@ -28,10 +38,14 @@ function(_pmm_download url dest)
     set(tmp "${dest}.tmp")
     _pmm_log(DEBUG "Downloading ${url}")
     _pmm_log(DEBUG "File will be written to ${dest}")
+    if (EXISTS "${dest}")
+        set(timeout TIMEOUT 5)
+    endif ()
     file(
         DOWNLOAD "${url}"
         "${tmp}"
         STATUS st
+        ${timeout}
         )
     list(GET st 0 rc)
     list(GET st 1 msg)
@@ -46,42 +60,54 @@ function(_pmm_download url dest)
             set("${ARG_RESULT_VARIABLE}" FALSE PARENT_SCOPE)
         endif()
     else()
-        file(RENAME "${tmp}" "${dest}")
-        _pmm_log(VERBOSE "Downloaded file ${url} to ${dest}")
+        file(SHA1 "${tmp}" tmp_hash)
+        if (EXISTS "${dest}")
+            file(SHA1 "${dest}" dest_hash)
+        endif ()
+        if (NOT tmp_hash STREQUAL dest_hash)
+            file(RENAME "${tmp}" "${dest}")
+            _pmm_log(VERBOSE "Downloaded file ${url} to ${dest}")
+        endif ()
         if(ARG_RESULT_VARIABLE)
             set("${ARG_RESULT_VARIABLE}" TRUE PARENT_SCOPE)
         endif()
     endif()
 endfunction()
 
-foreach(fname IN ITEMS
-        util.cmake
-        python.cmake
-        conan.cmake
-        vcpkg.cmake
-        cmcm.cmake
-        main.cmake
-        dds.cmake
-        )
-    get_filename_component(_dest "${PMM_DIR}/${fname}" ABSOLUTE)
+macro(_pmm_check_and_include_file filename)
+    get_filename_component(_dest "${PMM_DIR}/${filename}" ABSOLUTE)
     if(NOT EXISTS "${_dest}" OR PMM_ALWAYS_DOWNLOAD)
-        _pmm_download("${PMM_URL}/${fname}" "${_dest}")
+        _pmm_download("${PMM_URL}/${filename}" "${_dest}")
     endif()
     include("${_dest}")
-endforeach()
+endmacro()
+
+# Download the required modules
+_pmm_check_and_include_file(util.cmake)
+_pmm_check_and_include_file(main.cmake)
 
 # Do the update check.
-set(_latest_info_url "${PMM_URL_BASE}/latest-info.cmake")
-set(_latest_info_file "${PMM_DIR}/latest-info.cmake")
-_pmm_download("${_latest_info_url}" "${_latest_info_file}" NO_CHECK RESULT_VARIABLE did_download)
-if(NOT did_download)
-    if(NOT PMM_IGNORE_NEW_VERSION)
-        _pmm_log("Failed to check for updates (Couldn't download ${_latest_info_url})")
+function(_pmm_check_updates)
+    set(_latest_info_url "${PMM_URL_BASE}/master/latest-info.cmake")
+    set(_latest_info_file "${PMM_DIR}/latest-info.cmake")
+    file(DOWNLOAD "${_latest_info_url}" "${_latest_info_file}" STATUS did_download TIMEOUT 5)
+    list(GET did_download 0 rc)
+    if(rc EQUAL 0)
+        include("${_latest_info_file}")
+        _pmm_lift(PMM_LATEST_VERSION)
+    else()
+        if(NOT PMM_IGNORE_NEW_VERSION)
+            _pmm_log("Failed to check for updates (Couldn't download ${_latest_info_url})")
+        endif()
     endif()
-else()
-    include("${_latest_info_file}")
-endif()
+endfunction()
+
+# I don't have the update setup above, so disable it:
+_pmm_check_updates()
 
 if(CMAKE_SCRIPT_MODE_FILE)
     _pmm_script_main()
 endif()
+
+# Restore prior policy settings before returning to our includer
+cmake_policy(POP)
