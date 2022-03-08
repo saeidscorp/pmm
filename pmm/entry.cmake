@@ -88,7 +88,7 @@ _pmm_check_and_include_file(main.cmake)
 
 # Do the update check.
 function(_pmm_check_updates)
-    set(_latest_info_url "${PMM_URL_BASE}/master/latest-info.cmake")
+    set(_latest_info_url "${PMM_URL_BASE}/develop/latest-info.cmake")
     set(_latest_info_file "${PMM_DIR}/latest-info.cmake")
     file(DOWNLOAD "${_latest_info_url}" "${_latest_info_file}" STATUS did_download TIMEOUT 5)
     list(GET did_download 0 rc)
