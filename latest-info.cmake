@@ -1,4 +1,4 @@
-set(PMM_LATEST_VERSION 2.0.0)
+set(PMM_LATEST_VERSION 2.0.1)
 
 if(PMM_IGNORE_NEW_VERSION)
     return()
